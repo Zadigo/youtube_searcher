@@ -2,8 +2,8 @@ import json
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from search import QueryDict
 from tests import TEST_DIR
+from youtube_searcher.search import QueryDict
 
 
 class TestQueryDict(TestCase):
