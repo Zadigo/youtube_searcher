@@ -1,5 +1,11 @@
-from unittest import TestCase
-from unittest.mock import patch, Mock
+import json
+import pathlib
+from unittest import IsolatedAsyncioTestCase
+from unittest.mock import Mock, patch
+
+from requests import Response, Session
+
+from youtube_searcher.search import BaseSearch, Videos
 
 # {
 #     "context": {
@@ -20,7 +26,41 @@ from unittest.mock import patch, Mock
 #     "params": "EgIQAQ%3D%3D"
 # }
 
+TEST_DIR = pathlib.Path('.').joinpath('tests').absolute()
 
-class TestBaseSearch(TestCase):
-    def test_structure(self):
-        pass
+
+@patch.object(Session, 'send')
+class TestBaseSearch(IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        path = TEST_DIR.joinpath('data', 'video_search.json')
+        with open(path, mode='r', encoding='utf-8') as f:
+            cls.data = json.load(f)
+
+            mock_response = Mock(spec=Response)
+            mock_response.json.return_value = cls.data
+            cls.mock_response = mock_response
+
+    async def test_structure(self, mock_session: Mock):
+        mock_session.return_value = self.mock_response
+
+        instance = BaseSearch('Test Value')
+        path_to_items = 'contents__twoColumnSearchResultsRenderer__primaryContents__sectionListRenderer__contents'
+        instance.path_to_items = path_to_items
+
+        # await instance.results_iterator.load_cache()
+
+        values = list(instance.results_iterator)
+
+        # mock_session.assert_called_once()
+        # mock_response.assert_called_once()
+
+    async def test_video_search(self, mock_session: Mock):
+        mock_session.return_value = self.mock_response
+
+        instance = Videos('Some query')
+        path_to_items = 'contents__twoColumnSearchResultsRenderer__primaryContents__sectionListRenderer__contents'
+        instance.path_to_items = path_to_items
+
+        values = list(instance.results_iterator)
+        print(values)

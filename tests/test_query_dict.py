@@ -1,9 +1,11 @@
 import json
+import pathlib
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from tests import TEST_DIR
 from youtube_searcher.search import QueryDict
+
+TEST_DIR = pathlib.Path('.').joinpath('tests').absolute()
 
 
 class TestQueryDict(TestCase):
@@ -14,5 +16,13 @@ class TestQueryDict(TestCase):
             cls.data = json.load(f)
 
     def test_video_query_path(self):
-        query_path = 'contents__twoColumnSearchResultsRenderer__primaryContents___richGridRenderer__contents'
-        instance = QueryDict(self.data, query_path)
+        query_path = 'contents__twoColumnSearchResultsRenderer__primaryContents__sectionListRenderer__contents'
+        instance = QueryDict(self.data)
+        self.assertEqual(len(query_path.split('__')),
+                         5, "Key length is not valid")
+        qs1 = instance.filter(query_path)
+        self.assertIsInstance(qs1, QueryDict)
+        self.assertIsNotNone(qs1.queried_data)
+
+        with open('testing.json', mode='w') as f:
+            json.dump(instance.queried_data, f)

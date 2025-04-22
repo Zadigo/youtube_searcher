@@ -1,39 +1,56 @@
+import asyncio
 import json
 from functools import cached_property, lru_cache
-from typing import Dict, Generic, Mapping, Optional, Type, TypeVar, Union
+from typing import (AsyncIterator, Dict, Generic, Iterator, Mapping, Optional,
+                    Type, TypeVar, Union)
 from urllib.parse import urlencode
-
-from asgiref.sync import async_to_sync
+import itertools
+from asgiref.sync import async_to_sync, iscoroutinefunction
 from requests import Request, Session
 
-from youtubing.constants import SEARCH_KEY, USER_AGENT, SearchModes
+from youtube_searcher.constants import SEARCH_KEY, USER_AGENT, SearchModes
 
 B = TypeVar('B', bound='BaseSearch')
 
 NestedJson = Union[str, int, bool, Dict[str, 'D']]
 D = Mapping[str, NestedJson]
 
+Q = TypeVar('Q', bound='Query')
 
-class QueryDict:
-    """A helper class that can query a complex
-    dictionnary up to a certain point"""
 
-    def __init__(self, data: NestedJson, query_path: str):
+class Query:
+    def __init__(self, data: NestedJson):
+        self.initial_data: NestedJson = data
+        self.queried_data: Optional[list[D]] = None
+
+
+class QueryDict(Query):
+    """A helper class used to query the complex
+    dicts returned by the response"""
+
+    def __repr__(self):
+        return f'<QueryDict[{self.queried_data}]>'
+
+    def filter(self, query_path: str):
         self.keys = query_path.split('__')
-
-        result = None
         for key in self.keys:
-            if result is None:
-                is_valid = self.check(key, data)
+            if self.queried_data is None:
+                is_valid = self.check(key, self.initial_data)
                 if is_valid:
-                    result = data[key]
+                    self.queried_data = self.initial_data[key]
             else:
-                is_valid = self.check(key, data)
+                is_valid = self.check(key, self.queried_data)
                 if is_valid:
-                    result = result[key]
+                    self.queried_data = self.queried_data[key]
 
-    @staticmethod
-    def check(key: str, data: NestedJson):
+        if isinstance(self.queried_data, list):
+            return QueryList(self.queried_data)
+        else:
+            query = QueryDict(self.queried_data)
+            query.queried_data = self.queried_data
+            return query
+
+    def check(self, key: str, data: D):
         """A function that indicates wether the item is a
         dictionnary and therefore abled to be keyed"""
         value = data[key]
@@ -41,31 +58,59 @@ class QueryDict:
             return False
         elif isinstance(value, int):
             return False
-        else:
+        elif isinstance(value, dict):
             return True
+        elif isinstance(value, list):
+            # If the vvalue is a group of
+            # values, just set them directly
+            # on property
+            self.queried_data = value
+        else:
+            return False
+
+
+class QueryList(Query):
+    def __init__(self, initial_data: list):
+        super().__init__(initial_data)
+
+    def __iter__(self):
+        for item in self.initial_data:
+            yield item
 
 
 class ResultsIterator(Generic[B]):
     def __init__(self):
-        self.instance: B | None = None
+        self.search_instance: B | None = None
         self.response_data: dict[str, str] | None = None
+
+    def __get__(self, instance: B, cls: Optional[Type[B]] = None):
+        self.search_instance = instance
+        return self
+
+    def __iter__(self) -> Iterator[dict]:
+        self.load_cache()
+        instance = QueryDict(self.response_data)
+
+        if self.search_instance.path_to_items is None:
+            raise ValueError('Should set path to items')
+
+        queryset = instance.filter(self.search_instance.path_to_items)
+        items = self.search_instance.result_generator(queryset)
+        for item in items:
+            yield item
 
     @cached_property
     def data(self) -> dict[str, str] | None:
-        async_to_sync(self.load_cache)()
+        # async_to_sync(self.load_cache)()
+        self.load_cache()
         return self.response_data
 
-    def __get__(self, instance: B, cls: Optional[Type[B]] = None):
-        self.instance = instance
-        return self
+    def load_cache(self):
+        if self.response_data:
+            return
 
-    def __iter__(self):
-        async_to_sync(self.load_cache)()
-        return iter([])
-
-    async def load_cache(self):
-        if self.instance is not None:
-            session, request = self.instance.create_request()
+        if self.search_instance is not None:
+            session, request = self.search_instance.create_request()
 
             try:
                 response = session.send(request)
@@ -74,13 +119,11 @@ class ResultsIterator(Generic[B]):
             else:
                 self.response_data = response.json()
 
-            # instance = QueryDict(self.response_data, self.instance.query_path)
-
     async def next(self):
         pass
 
 
-class BaseSearch:
+class BaseSearch(Generic[Q]):
     response_data = None
     results = []
     results_iterator = ResultsIterator()
@@ -93,7 +136,9 @@ class BaseSearch:
         self.search_preferences = search_preferences
         self.timeout = timeout
         self.continuation_key = None
-        self.query_path = None
+        # The path to the list of items that
+        # we are interested in a__b__c
+        self.path_to_items = None
 
     @property
     def request_payload(self) -> D:
@@ -114,6 +159,11 @@ class BaseSearch:
     def url(self):
         encoded_key = urlencode({'key': SEARCH_KEY})
         return f'https://www.youtube.com/youtubei/v1/search?{encoded_key}'
+
+    def result_generator(self, queryset: Q) -> list:
+        """Custom class used to generate the results
+        for the given class"""
+        return []
 
     def create_request(self):
         session = Session()
@@ -171,7 +221,27 @@ class Videos(BaseSearch):
     def __init__(self, query: str, *, limit: int = 20, **kwargs: str):
         self.search_mode = (True, True, True)
         super().__init__(query, limit, search_preferences=SearchModes.videos, **kwargs)
-        self.query_path = 'contents__twoColumnSearchResultsRenderer__primaryContents___richGridRenderer__contents'
+        self.path_to_items = 'contents__twoColumnSearchResultsRenderer__primaryContents__sectionListRenderer__contents'
+
+    def result_generator(self, queryset: Query) -> Iterator[dict]:
+        for item in queryset:
+            if 'itemSectionRenderer' in item:
+                for content in item['itemSectionRenderer']['contents']:
+                    value = content.get('videoRenderer', None)
+                    if value is None:
+                        continue
+
+                    yield {
+                        'video_id': value['videoId'],
+                        'thumbnail': value['thumbnail'],
+                        'title': value['title']['runs'][-1]['text'],
+                        'publication_text': value['publishedTimeText']['simpleText'],
+                        'duration': value['lengthText']['simpleText'],
+                        'view_count_text': value['viewCountText']['simpleText'],
+                        'search_key': value['searchVideoResultEntityKey']
+                    }
+            elif 'continuationItemRenderer' in item:
+                continue
 
 
 class Channels(BaseSearch):

@@ -33,7 +33,7 @@ SEARCH_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
 
 CONTENT_PATH = [
     'contents', 'twoColumnSearchResultsRenderer',
-                'primaryContents', 'sectionListRenderer', 'contents'
+    'primaryContents', 'sectionListRenderer', 'contents'
 ]
 
 FALLBACK_CONTENT_PATH = [
