@@ -27,26 +27,6 @@ class BaseSearch(Generic[Q, QL, DC]):
         # we are interested in a__b__c
         self.path_to_items: Optional[str] = None
 
-    @property
-    def request_payload(self) -> D:
-        return {
-            'context': {
-                'client': {
-                    'clientName': 'WEB',
-                    'clientVersion': '2.20210224.06.00',
-                    'newVisitorCookie': True
-                },
-                'user': {
-                    'lockedSafetyMode': False
-                }
-            }
-        }
-
-    @property
-    def url(self):
-        encoded_key = urlencode({'key': SEARCH_KEY})
-        return f'https://www.youtube.com/youtubei/v1/search?{encoded_key}'
-
     def result_generator(self, queryset: QL) -> Iterator[D]:
         """Custom method used to generate the final results
         of a target element within the response data. The target
@@ -64,27 +44,36 @@ class BaseSearch(Generic[Q, QL, DC]):
         for item in queryset:
             yield item
 
-    def create_request(self):
+    def get_url(self, **query: str):
+        encoded_key = urlencode({'key': SEARCH_KEY, **query})
+        return f'https://www.youtube.com/youtubei/v1/search?{encoded_key}'
+
+    def get_payload(self, **extra: str):
+        """Needs to be implemented by the subclasses in order
+        to create the payload that will be used with the request"""
+        base_payload = {
+            'context': {
+                'client': {
+                    'clientName': 'WEB',
+                    'clientVersion': '2.20210224.06.00',
+                    'newVisitorCookie': True
+                },
+                'user': {
+                    'lockedSafetyMode': False
+                }
+            }
+        }
+        return base_payload | extra
+
+    def create_request(self, exta_payload: dict[str, str] = {}, url_query: dict[str, str] = {}):
         session = Session()
 
-        payload = self.request_payload.copy()
-        payload['query'] = self.query
-        payload['client'] = {
-            'hl': self.language,
-            'gl': self.region
-        }
-
-        if self.search_preferences:
-            payload['params'] = self.search_preferences
-
-        if self.continuation_key is not None:
-            payload['continuation'] = self.continuation_key
-
+        payload = self.get_payload(**exta_payload)
         data = json.dumps(payload).encode('utf-8')
 
         params = {
             'method': 'post',
-            'url': self.url,
+            'url': self.get_url(**url_query),
             'data': data
         }
 
@@ -134,6 +123,22 @@ class Videos(BaseSearch):
                     }
             elif 'continuationItemRenderer' in item:
                 continue
+
+    def get_payload(self, **extra: dict[str, str]):
+        payload = super().get_payload(**extra)
+
+        payload['query'] = self.query
+        payload['client'] = {
+            'hl': self.language,
+            'gl': self.region
+        }
+
+        if self.search_preferences:
+            payload['params'] = self.search_preferences
+
+        if self.continuation_key is not None:
+            payload['continuation'] = self.continuation_key
+        return payload
 
 
 class Channels(BaseSearch):
