@@ -10,7 +10,8 @@ class Query(Generic[B]):
         self.queried_data: Optional[list[D]] = None
 
     def __repr__(self):
-        return f'<QueryDict[{self.queried_data}]>'
+        data = self.queried_data or self.initial_data
+        return f'<QueryDict[{data}]>'
 
     def __item__(self, key: str):
         return self.initial_data.get(key, None)
