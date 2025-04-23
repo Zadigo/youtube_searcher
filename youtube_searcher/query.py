@@ -20,7 +20,9 @@ class Query(Generic[B]):
         under the last key of the path"""
         return NotImplemented
 
-    def exclude(self, *args: str):
+    def get(self, key_or_path: str):
+        """Function used to get the value stored under
+        a specific key in the dictionnary"""
         return NotImplemented
 
 
