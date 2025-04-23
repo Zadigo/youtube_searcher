@@ -56,6 +56,13 @@ class QueryDict(Query):
     def new(cls, data):
         return cls(data)
 
+    def get(self, key_or_path):
+        if '__' in key_or_path:
+            key = key_or_path.split('__')[-1]
+            query_dict = self.filter(key_or_path)
+            return query_dict[key]
+        return self.cache[key_or_path]
+
     def filter(self, query_path: str):
         """Function used to match certain values in
         the response data"""
