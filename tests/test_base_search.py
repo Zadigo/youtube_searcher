@@ -32,6 +32,8 @@ TEST_DIR = pathlib.Path('.').joinpath('tests').absolute()
 
 @dataclass
 class TestModel:
+    # Since we have to renderer on the base
+    # search model, we will get dicts
     itemSectionRenderer: str = None
     continuationItemRenderer: str = None
 

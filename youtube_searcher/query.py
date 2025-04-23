@@ -1,21 +1,27 @@
-import inspect
-from functools import cached_property
-from typing import Generic, Iterator, Optional, Type
 import dataclasses
-from youtube_searcher.typings import DC, B, D
+import inspect
+from collections import defaultdict, OrderedDict
+from functools import cached_property
+from typing import Generic, Iterator, Optional, Type, Union
+
+from youtube_searcher.typings import DC, QL, B, D
 
 
 class Query(Generic[B]):
-    def __init__(self, data: D):
-        self.initial_data: D = data
-        self.queried_data: Optional[D | list[D]] = None
+    def __init__(self, data: Union[D, list[D]]):
+        self.cache: Union[D, list[D]] = data
 
     def __repr__(self):
-        data = self.queried_data or self.initial_data
-        return f'<QueryDict[{data}]>'
+        return f'<QueryDict[{self.cache}]>'
 
-    def __getitem__(self, key: str):
-        return self.initial_data.get(key, None)
+    def filter(self, query_path: str):
+        """Function used to traverse the keys within
+        a dictionnary returning the specific value stored
+        under the last key of the path"""
+        return NotImplemented
+
+    def exclude(self, *args: str):
+        return NotImplemented
 
 
 class QueryDict(Query):
@@ -29,37 +35,51 @@ class QueryDict(Query):
     ... {'eu': 'Paul'}
 
     If the resulting element is a list, `QueryList` is returned
-    which is essentially a list returning `QueryDict` instances
+    which is essentially a list returning `QueryDict` instances.
+
+    Important note, the role of the path is not to return the value
+    of the last key but the object of the target element. For example
+    a `location__country` path in `{'location': {'country': 'USA'}}` will 
+    not return "USA" but the block that contains the key "country" therefore
+    `{'country': 'USA'}` is the expected result
     """
 
-    def __dict__(self):
-        if self.queried_data and isinstance(self.queried_data, (dict, list)):
-            return dict(self.queried_data)
-        elif self.initial_data:
-            return dict(self.initial_data)
-        else:
-            pass
+    def __contains__(self, value: str | int):
+        return value in self.cache
+
+    def __getitem__(self, key: str):
+        return self.cache[key]
+
+    @classmethod
+    def new(cls, data):
+        return cls(data)
 
     def filter(self, query_path: str):
         """Function used to match certain values in
         the response data"""
         self.keys = query_path.split('__')
-        for key in self.keys:
-            if self.queried_data is None:
-                is_valid = self.check(key, self.initial_data)
-                if is_valid:
-                    self.queried_data = self.initial_data[key]
-            else:
-                is_valid = self.check(key, self.queried_data)
-                if is_valid:
-                    self.queried_data = self.queried_data[key]
 
-        if isinstance(self.queried_data, list):
-            return QueryList(self.queried_data)
-        else:
-            query = QueryDict(self.queried_data)
-            query.queried_data = self.queried_data
-            return query
+        queried_data: D | None = None
+
+        for key in self.keys:
+            if queried_data is None:
+                is_valid, value = self.check(key, self.cache)
+                if is_valid:
+                    queried_data = value
+            else:
+                is_valid, value = self.check(key, queried_data)
+                if is_valid:
+                    queried_data = queried_data[key]
+                elif isinstance(value, list):
+                    # if the return value is a list
+                    # we do not iterate the list but
+                    # prefer a list iteraotr: QueryList
+                    queried_data = value
+                    break
+
+        if isinstance(queried_data, list):
+            return QueryList(queried_data)
+        return QueryDict.new(queried_data)
 
     def check(self, key: str, data: D):
         """A function that indicates wether the item that
@@ -75,7 +95,7 @@ class QueryDict(Query):
         # don't bother raising an error just
         # return False
         if isinstance(data, (int, str, bool)):
-            return False
+            return False, data
 
         if inspect.isclass(data):
             data = data.__dict__
@@ -85,18 +105,14 @@ class QueryDict(Query):
 
         value = data[key]
         if isinstance(value, str):
-            return False
+            return False, value
         elif isinstance(value, int):
-            return False
+            return False, value
         elif isinstance(value, dict):
-            return True
+            return True, value
         elif isinstance(value, list):
-            # If the vvalue is a group of
-            # values, just set them directly
-            # on the queried_data property
-            self.queried_data = value
-        else:
-            return False
+            return False, value
+        return False, value
 
 
 class QueryList(Query):
@@ -108,7 +124,7 @@ class QueryList(Query):
     ... instance = QueryList(value)
     """
 
-    def __init__(self, initial_data: list):
+    def __init__(self, initial_data: list[D]):
         super().__init__(initial_data)
 
     def __repr__(self):
@@ -125,13 +141,18 @@ class QueryList(Query):
         return len(self.data)
 
     @cached_property
-    def data(self):
+    def data(self) -> list[QueryDict]:
+        """Returns the elements of the
+        cache as list of `QueryDict` instances"""
         items = []
-
-        data_to_iterate = self.queried_data or self.initial_data
-
-        for item in data_to_iterate:
+        for item in self.cache:
             items.append(QueryDict(item))
+        return items
+
+    def filter(self, query_path: str) -> list[QueryDict]:
+        items = []
+        for item in self.data:
+            items.append(item.filter(query_path))
         return items
 
 
@@ -159,16 +180,41 @@ class ResultsIterator(Generic[B, DC]):
 
         for item in items:
             if isinstance(item, QueryDict):
-                # If no query was performed on the initial data
-                # return it even though it could raise an error
-                # on the model that we are using
-                item = item.queried_data or item.initial_data
+                item = item.cache
             yield self.search_instance.model(**item)
 
     @cached_property
     def data(self) -> dict[str, str] | None:
         self.load_cache()
         return self.response_data
+
+    def all(self):
+        return list(self)
+
+    def values_list(self, *fields):
+        """Returns a subset of values matching the given
+        fields from the dataset
+
+        >>> instance = Videos('Arlette pop the baloon', limit=2)
+        ... instance.objects.values_list('video_id', 'title')
+        ... [OrderedDict({'video_id': 'MVkuHKIPWgs', 'title': 'Ep 51'})]
+        """
+        fields = list(fields)
+
+        def dict_generator(fields_to_use: list[str]):
+            for item in self.all():
+                data = OrderedDict()
+
+                if not fields_to_use:
+                    fields_to_use = map(
+                        lambda x: x.name,
+                        dataclasses.fields(item)
+                    )
+
+                for field in fields_to_use:
+                    data[field] = getattr(item, field)
+                yield data
+        return list(dict_generator(fields))
 
     def load_cache(self, refresh: bool = False):
         """Method that used to create and send the request 

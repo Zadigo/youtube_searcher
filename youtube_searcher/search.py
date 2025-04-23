@@ -6,15 +6,13 @@ from requests import Request, Session
 
 from youtube_searcher.constants import SEARCH_KEY, USER_AGENT, SearchModes
 from youtube_searcher.models.videos import VideoModel
-from youtube_searcher.query import Query, QueryDict, QueryList, ResultsIterator
+from youtube_searcher.query import Query, QueryDict, ResultsIterator
 from youtube_searcher.typings import DC, QL, D, Q
 
 
 class BaseSearch(Generic[Q, QL, DC]):
-    response_data = None
-    results = []
-    results_iterator = ResultsIterator()
     model: DC = None
+    objects = ResultsIterator()
 
     def __init__(self, query: str, limit: Optional[int] = 10, language: Optional[str] = 'en', region: Optional[str] = 'US', search_preferences: Optional[str] = None, timeout: Optional[int] = None):
         self.query = query
@@ -51,16 +49,17 @@ class BaseSearch(Generic[Q, QL, DC]):
 
     def result_generator(self, queryset: QL) -> Iterator[D]:
         """Custom method used to generate the final results
-        for the given request. It should return a list ofdictionnaries
-        containing the key, value pairs that should be kept"""
+        of a target element within the response data. The target
+        value should return a list of dictionnaries containing 
+        the key, value pairs that should be kept"""
         if isinstance(queryset, QueryDict):
             raise ValueError(
                 "Result generator requires a "
                 "QueryList of items to iterate"
             )
 
-        if isinstance(queryset, list):
-            queryset = QueryList(queryset)
+        # if isinstance(queryset, list):
+        #     queryset = QueryList(queryset)
 
         for item in queryset:
             yield item

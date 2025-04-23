@@ -1,7 +1,7 @@
+import dataclasses
 import json
 import pathlib
 from unittest import TestCase
-import dataclasses
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from youtube_searcher.query import QueryDict, QueryList, ResultsIterator
@@ -16,63 +16,62 @@ class TestQueryDict(TestCase):
         with open(path, mode='r', encoding='utf-8') as f:
             cls.data = json.load(f)
 
+        cls.simple_data = {
+            'text': {
+                'name': 'Julie',
+                'age': {
+                    'europe': 19,
+                    'america': 25
+                }
+            }
+        }
+
     def test_simple_dict(self):
-        data = {'text': {'name': 'Julie', 'age': {'europe': 19, 'america': 25}}}
-        instance = QueryDict(data)
+        instance = QueryDict(self.simple_data)
 
         expected = {'name': 'Julie', 'age': {'europe': 19, 'america': 25}}
         # Test: Item is dictionnary
         qs = instance.filter('text')
-        self.assertDictEqual(qs.queried_data, expected)
+        self.assertDictEqual(qs.cache, expected)
 
-        # This should return the dict in which
-        # the value should be not the value itself ??
-        # or should we return the value ??
-        qs2 = instance.filter('name')
-        self.assertDictEqual(qs2.queried_data, expected)
+    def test_chaining(self):
+        instance = QueryDict(self.simple_data)
 
-        expected = {'europe': 19, 'america': 25}
-        qs3 = instance.filter('age__europe')
-        self.assertDictEqual(qs3.queried_data, expected)
+        qs1 = instance.filter('text')
+        qs2 = qs1.filter('age__europe')
+        self.assertDictEqual(qs2.cache, self.simple_data['text']['age'])
 
     def test_check(self):
-        value = {'name': 'Kendall', 'location': {
-            'america': 'NY'}, 'ages': [24, 25]}
+        value = {
+            'name': 'Kendall',
+            'ages': [24, 25],
+            'location': {
+                'america': 'NY'
+            }
+        }
 
         instance = QueryDict(value)
-        result = instance.check('name', value)
+        result, _ = instance.check('name', value)
         self.assertFalse(result)
 
-        result = instance.check('location', value)
+        result, _ = instance.check('location', value)
         self.assertTrue(result)
 
-        result = instance.check('ages', value)
+        result, _ = instance.check('ages', value)
         self.assertFalse(result)
-        self.assertIsInstance(instance.queried_data, list)
-
-    def test_video_query_path(self):
-        query_path = 'contents__twoColumnSearchResultsRenderer__primaryContents__sectionListRenderer__contents'
-        instance = QueryDict(self.data)
-        self.assertEqual(len(query_path.split('__')),
-                         5, "Key length is not valid")
-        qs1 = instance.filter(query_path)
-        self.assertIsInstance(qs1, (QueryDict, QueryList))
-        self.assertIsNone(qs1.queried_data)
-
-    def test_can_get_dict(self):
-        instance = QueryDict({'name': 'Kendall'})
-        result = dict(instance)
-        print(result)
 
 
 class TestQueryList(TestCase):
-    def test_simple_list(self):
-        value = [
-            {'name': 'Kendall'},
-            {'name': 'Kylie'},
+    @classmethod
+    def setUpClass(cls):
+        cls.values = [
+            {'name': 'Kendall', 'location': {'country': 'USA', 'city': None}},
+            {'name': 'Kylie', 'location': {'country': 'USA', 'city': None}},
         ]
 
-        instance = QueryList(value)
+    def test_simple_list(self):
+
+        instance = QueryList(self.values)
         item = instance[0]
         self.assertIsInstance(item, QueryDict)
 
@@ -80,7 +79,16 @@ class TestQueryList(TestCase):
         instance = QueryList([1, 2, 3])
         item = instance[0]
         qs = item.filter('text')
-        print(instance.queried_data, instance.initial_data)
+        print(qs)
+
+    def test_filter_dicts(self):
+        instance = QueryList(self.values)
+        result = instance.filter('location__country')
+
+        expected = self.values[0]['location']
+        for item in result:
+            with self.subTest(item=item):
+                self.assertDictEqual(item.cache, expected)
 
 
 class TestResultIterator(TestCase):

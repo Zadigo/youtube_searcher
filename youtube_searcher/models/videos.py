@@ -21,7 +21,7 @@ class VideoModel:
     thumbnails: list = field(default_factory=list)
 
     def __repr__(self):
-        return f'<VideoModel [{self.video_id}]>'
+        return f'<VideoModel [{self.title}]>'
 
     def __hash__(self):
         return hash((self.video_id,))
