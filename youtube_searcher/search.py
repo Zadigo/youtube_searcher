@@ -7,7 +7,7 @@ from requests import Request, Session
 from youtube_searcher.constants import SEARCH_KEY, USER_AGENT, SearchModes
 from youtube_searcher.models.videos import VideoModel
 from youtube_searcher.query import Query, QueryDict, ResultsIterator
-from youtube_searcher.typings import DC, D, Q, QL
+from youtube_searcher.typings import DC, QL, D, Q
 
 
 class BaseSearch(Generic[Q, QL, DC]):
@@ -124,7 +124,8 @@ class Videos(BaseSearch):
                         'publication_text': value['publishedTimeText']['simpleText'],
                         'duration': value['lengthText']['simpleText'],
                         'view_count_text': value['viewCountText']['simpleText'],
-                        'search_key': value['searchVideoResultEntityKey']
+                        'search_key': value['searchVideoResultEntityKey'],
+                        'channel': value['ownerText']['runs']
                     }
             elif 'continuationItemRenderer' in item:
                 continue

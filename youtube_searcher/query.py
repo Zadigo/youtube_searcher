@@ -13,7 +13,7 @@ class Query(Generic[B]):
         data = self.queried_data or self.initial_data
         return f'<QueryDict[{data}]>'
 
-    def __item__(self, key: str):
+    def __getitem__(self, key: str):
         return self.initial_data.get(key, None)
 
 
@@ -79,11 +79,14 @@ class QueryList(Query):
     def __init__(self, initial_data: list):
         super().__init__(initial_data)
 
+    def __repr__(self):
+        return '<QueryList[{self.data}]>'
+
     def __iter__(self):
-        for item in self.initial_data:
+        for item in self.data:
             yield item
 
-    def __item__(self, index: int):
+    def __getitem__(self, index: int):
         return self.initial_data[index]
 
     def __len__(self):
