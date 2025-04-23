@@ -86,6 +86,16 @@ class QueryList(Query):
     def __item__(self, index: int):
         return self.initial_data[index]
 
+    def __len__(self):
+        return len(self.data)
+
+    @cached_property
+    def data(self):
+        items = []
+        for item in self.initial_data:
+            items.append(QueryDict(item))
+        return items
+
 
 class ResultsIterator(Generic[B, DC]):
     def __init__(self):
