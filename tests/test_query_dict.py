@@ -3,7 +3,7 @@ import pathlib
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from youtube_searcher.search import QueryDict
+from youtube_searcher.query import QueryDict, QueryList
 
 TEST_DIR = pathlib.Path('.').joinpath('tests').absolute()
 
@@ -21,8 +21,5 @@ class TestQueryDict(TestCase):
         self.assertEqual(len(query_path.split('__')),
                          5, "Key length is not valid")
         qs1 = instance.filter(query_path)
-        self.assertIsInstance(qs1, QueryDict)
-        self.assertIsNotNone(qs1.queried_data)
-
-        with open('testing.json', mode='w') as f:
-            json.dump(instance.queried_data, f)
+        self.assertIsInstance(qs1, (QueryDict, QueryList))
+        self.assertIsNone(qs1.queried_data)

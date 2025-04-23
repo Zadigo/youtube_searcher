@@ -1,5 +1,6 @@
 import json
 import pathlib
+from dataclasses import is_dataclass
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import Mock, patch
 
@@ -63,4 +64,9 @@ class TestBaseSearch(IsolatedAsyncioTestCase):
         instance.path_to_items = path_to_items
 
         values = list(instance.results_iterator)
-        print(values)
+
+        for value in values:
+            with self.subTest(value=value):
+                self.assertTrue(is_dataclass(value))
+
+        item = values[0]
