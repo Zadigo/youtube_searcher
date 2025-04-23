@@ -165,7 +165,10 @@ class Videos(ModelsGeneratorMixin, BaseSearch):
                         'channel': self._channel_generator(channel)
                     }
             elif 'continuationItemRenderer' in item:
-                continue
+                # Parse the contuniation key e.g. the key that can
+                # be used to get the other videos in the search
+                path = 'continuationItemRenderer__continuationEndpoint__continuationCommand__token'
+                self.continuation_key = item.get(path)
 
     def get_payload(self, **extra: dict[str, str]):
         payload = super().get_payload(**extra)
