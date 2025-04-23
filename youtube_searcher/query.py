@@ -17,8 +17,18 @@ class Query(Generic[B]):
 
 
 class QueryDict(Query):
-    """A helper class used to query the complex
-    dicts returned by the response"""
+    """`QueryDict` traverses a complex dictionnary in
+    order to return the subsection that we are
+    interested in. For instance:
+
+    >>> value = {'name': {'firstname': {'eu': 'Paul'}}}
+    ... instance = QueryDict(value)
+    ... instance.filter('name__firstname__eu')
+    ... {'eu': 'Paul'}
+
+    If the resulting element is a list, `QueryList` is returned
+    which is essentially a list returning `QueryDict` instances
+    """
 
     def filter(self, query_path: str):
         """Function used to match certain values in
