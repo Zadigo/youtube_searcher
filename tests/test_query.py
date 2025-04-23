@@ -4,7 +4,7 @@ import pathlib
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from youtube_searcher.query import QueryDict, QueryList, ResultsIterator
+from youtube_searcher.query import Query, QueryDict, QueryList, ResultsIterator
 
 TEST_DIR = pathlib.Path('.').joinpath('tests').absolute()
 
@@ -40,6 +40,11 @@ class TestQueryDict(TestCase):
         qs1 = instance.filter('text')
         qs2 = qs1.filter('age__europe')
         self.assertDictEqual(qs2.cache, self.simple_data['text']['age'])
+
+    def test_get(self):
+        instance = QueryDict({'age': 15, 'location': {'country': 'Europe'}})
+        self.assertEqual(instance.get('age'), 15)
+        self.assertEqual(instance.get('location__country'), 'Europe')
 
     def test_check(self):
         value = {

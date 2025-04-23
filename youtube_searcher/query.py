@@ -64,8 +64,6 @@ class QueryDict(Query):
         return self.cache[key_or_path]
 
     def filter(self, query_path: str):
-        """Function used to match certain values in
-        the response data"""
         self.keys = query_path.split('__')
 
         queried_data: D | None = None
@@ -271,6 +269,3 @@ class ResultsIterator(Generic[B, DC]):
             if 'estimatedResults' in self.response_data:
                 value = self.response_data['estimatedResults']
                 self.search_instance.estimated_results = int(value)
-
-    async def next(self):
-        pass

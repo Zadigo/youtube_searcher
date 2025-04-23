@@ -1,12 +1,13 @@
 import json
-from typing import Generic, Iterator, Optional
+from typing import Generic, Iterator, Optional, Self
 from urllib.parse import urlencode
 
 from requests import Request, Session
 
 from youtube_searcher.constants import SEARCH_KEY, USER_AGENT, SearchModes
 from youtube_searcher.models.channels import ChannelModel
-from youtube_searcher.models.videos import SimpleChannelModel, ThumbnailModel, VideoModel
+from youtube_searcher.models.videos import (SimpleChannelModel, ThumbnailModel,
+                                            VideoModel)
 from youtube_searcher.query import Query, QueryDict, ResultsIterator
 from youtube_searcher.typings import DC, QL, D, Q
 
@@ -136,6 +137,18 @@ class Videos(ModelsGeneratorMixin, BaseSearch):
         super().__init__(query, limit, search_preferences=SearchModes.videos, **kwargs)
         self.path_to_items = 'contents__twoColumnSearchResultsRenderer__primaryContents__sectionListRenderer__contents'
 
+    # @classmethod
+    # def new(cls, query: str, current_instance: Self):
+    #     keys = [
+    #         'limit', 'language', 'region',
+    #         'search_preferences', 'timeout', 'continuation_key',
+    #         'estimate_results', 'browse_id', 'path_to_items'
+    #     ]
+    #     instance = cls(query)
+    #     for key in keys:
+    #         setattr(instance, key, getattr(current_instance, key))
+    #     return instance
+
     def _channel_generator(self, values: dict[str, str]):
         title = values['text']
         channel_id = values['navigationEndpoint']['browseEndpoint']['browseId']
@@ -185,6 +198,9 @@ class Videos(ModelsGeneratorMixin, BaseSearch):
         if self.continuation_key is not None:
             payload['continuation'] = self.continuation_key
         return payload
+
+    # def next(self):
+    #     return self.new(self.query, self.limit)
 
 
 class Channels(BaseSearch):
