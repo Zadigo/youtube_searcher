@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Kryptone"
+description = "YouTube search is Python module that allows users to search YouTube on different levels."
+version="1.0.0"
+requires-python = ">= 3.13"
+readme = "README.md"
+keywords = [
+  "yt",
+  "YouTube",
+  "YouTube search",
+  "Seach YouTube"
+]
+dependencies = [
+  "requests",
+  "pandas"
+]
+authors = [
+  { name = "Joe Tatusko", email = "tatuskojc@gmail.com"},
+]
+maintainers = [
+  {name = "John Pendenque", email = "pendenquejohn@gmail.com"}
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Operating System :: POSIX",
+  "Operating System :: Unix",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Natural Language :: English",
+  "Operating System :: Microsoft :: Windows :: Windows 11",
+  "Operating System :: MacOS"
+]
+
+[project.urls]
+Homepage = "https://github.com/Zadigo/youtube_searcher"
+Documentation = "https://github.com/Zadigo/youtube_searcher/wiki"
+Repository = "https://github.com/Zadigo/youtube_searcher.git"
+Changelog = "https://github.com/Zadigo/kryptone/blob/main/CHANGELOG.md"
