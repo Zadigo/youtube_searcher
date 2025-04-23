@@ -127,9 +127,10 @@ class ResultsIterator(Generic[B, DC]):
         self.load_cache()
         return self.response_data
 
-    def load_cache(self):
-        """Method that sends the request to YouTube
-        in order to get the searched results"""
+    def load_cache(self, refresh: bool = False):
+        """Method that used to create and send the request 
+        to YouTube search url. The results are stored in
+        the cache of the class"""
         if self.response_data:
             return
 
