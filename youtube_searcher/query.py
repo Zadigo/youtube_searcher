@@ -1,13 +1,14 @@
+import inspect
 from functools import cached_property
 from typing import Generic, Iterator, Optional, Type
-
-from youtube_searcher.typings import B, D, DC
+import dataclasses
+from youtube_searcher.typings import DC, B, D
 
 
 class Query(Generic[B]):
     def __init__(self, data: D):
         self.initial_data: D = data
-        self.queried_data: Optional[list[D]] = None
+        self.queried_data: Optional[D | list[D]] = None
 
     def __repr__(self):
         data = self.queried_data or self.initial_data
@@ -31,6 +32,14 @@ class QueryDict(Query):
     which is essentially a list returning `QueryDict` instances
     """
 
+    def __dict__(self):
+        if self.queried_data and isinstance(self.queried_data, (dict, list)):
+            return dict(self.queried_data)
+        elif self.initial_data:
+            return dict(self.initial_data)
+        else:
+            pass
+
     def filter(self, query_path: str):
         """Function used to match certain values in
         the response data"""
@@ -53,8 +62,27 @@ class QueryDict(Query):
             return query
 
     def check(self, key: str, data: D):
-        """A function that indicates wether the item is a
-        dictionnary and therefore abled to be keyed"""
+        """A function that indicates wether the item that
+        we are trying to query is a dictionnary and therefore
+        has the ability to be traversed
+
+        >>> value = {'name': 'Kendall'}
+        ... instance = QueryDict(value)
+        ... instance.check('name', value)
+        ... False
+        """
+        # In the value is just a plain item,
+        # don't bother raising an error just
+        # return False
+        if isinstance(data, (int, str, bool)):
+            return False
+
+        if inspect.isclass(data):
+            data = data.__dict__
+
+        if dataclasses.is_dataclass(data):
+            data = dataclasses.asdict(data)
+
         value = data[key]
         if isinstance(value, str):
             return False
@@ -65,7 +93,7 @@ class QueryDict(Query):
         elif isinstance(value, list):
             # If the vvalue is a group of
             # values, just set them directly
-            # on property
+            # on the queried_data property
             self.queried_data = value
         else:
             return False
@@ -74,20 +102,24 @@ class QueryDict(Query):
 class QueryList(Query):
     """`QueryList` returns a list of `QueryDict`
     instances in order to traverse dictionnaries
-    nested within a list"""
+    nested within a list
+
+    >>> value = [{'name': 'Kendall'}]
+    ... instance = QueryList(value)
+    """
 
     def __init__(self, initial_data: list):
         super().__init__(initial_data)
 
     def __repr__(self):
-        return '<QueryList[{self.data}]>'
+        return f'<QueryList[{self.data}]>'
 
     def __iter__(self):
         for item in self.data:
             yield item
 
     def __getitem__(self, index: int):
-        return self.initial_data[index]
+        return self.data[index]
 
     def __len__(self):
         return len(self.data)
@@ -95,7 +127,10 @@ class QueryList(Query):
     @cached_property
     def data(self):
         items = []
-        for item in self.initial_data:
+
+        data_to_iterate = self.queried_data or self.initial_data
+
+        for item in data_to_iterate:
             items.append(QueryDict(item))
         return items
 
@@ -123,6 +158,11 @@ class ResultsIterator(Generic[B, DC]):
             raise ValueError('model cannot be None')
 
         for item in items:
+            if isinstance(item, QueryDict):
+                # If no query was performed on the initial data
+                # return it even though it could raise an error
+                # on the model that we are using
+                item = item.queried_data or item.initial_data
             yield self.search_instance.model(**item)
 
     @cached_property

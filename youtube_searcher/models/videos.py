@@ -17,6 +17,7 @@ class VideoModel:
     duration: str
     view_count_text: str
     search_key: str
+    channel: dict = field(default_factory=dict)
     thumbnails: list = field(default_factory=list)
 
     def __repr__(self):
