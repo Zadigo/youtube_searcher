@@ -1,12 +1,10 @@
-# from youtubesearchpython import VideosSearch
+from youtube_searcher.search import ChannelVideos, Videos
+# # v = Videos('Arlette pop the balloon')
+v = ChannelVideos('Pop the balloon', 'UCzo3jVzn-Z9LrFVwAE7iDbw')
+print(v.objects.all())
 
-# videosSearch = VideosSearch('Jalousie Princess', limit=2)
+# from youtubesearchpython import VideosSearch, ChannelSearch
 
-# print(videosSearch.result())
-
-
-from youtube_searcher.search import Videos
-
-
-v = Videos('Arlette pop the baloon', limit=2)
-print(v.objects.values_list('video_id', 'title'))
+# # s = VideosSearch('Jalousie Princess', limit=2)
+# s = ChannelSearch('Watermelon Sugar', 'UCZFWPqqPkFlNwIxcpsLOwew')
+# print(s.result())

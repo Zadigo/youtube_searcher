@@ -1,6 +1,6 @@
 import dataclasses
 import inspect
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict, defaultdict
 from functools import cached_property
 from typing import Generic, Iterator, Optional, Type, Union
 
@@ -103,16 +103,21 @@ class QueryDict(Query):
         if dataclasses.is_dataclass(data):
             data = dataclasses.asdict(data)
 
-        value = data[key]
-        if isinstance(value, str):
+        try:
+            value = data[key]
+        except KeyError:
+            print(f'Warning: Could not get {key} from: {data}')
+            return False, []
+        else:
+            if isinstance(value, str):
+                return False, value
+            elif isinstance(value, int):
+                return False, value
+            elif isinstance(value, dict):
+                return True, value
+            elif isinstance(value, list):
+                return False, value
             return False, value
-        elif isinstance(value, int):
-            return False, value
-        elif isinstance(value, dict):
-            return True, value
-        elif isinstance(value, list):
-            return False, value
-        return False, value
 
 
 class QueryList(Query):
@@ -155,6 +160,12 @@ class QueryList(Query):
             items.append(item.filter(query_path))
         return items
 
+    def last(self):
+        return self.data[-1]
+
+    def first(self):
+        return self.data[-0]
+
 
 class ResultsIterator(Generic[B, DC]):
     def __init__(self):
@@ -168,6 +179,15 @@ class ResultsIterator(Generic[B, DC]):
     def __iter__(self) -> Iterator[DC]:
         self.load_cache()
         instance = QueryDict(self.response_data)
+
+        # Full clean can modify the initial query dict
+        # instance by returning a different one
+        instance = self.search_instance.full_clean(instance)
+        if instance is None:
+            raise ValueError('Full clean should return a value')
+
+        if not isinstance(instance, QueryDict):
+            raise ValueError('Full clean return value should be a QueryDict')
 
         if self.search_instance.path_to_items is None:
             raise ValueError('Should set path to items')
@@ -188,7 +208,7 @@ class ResultsIterator(Generic[B, DC]):
         self.load_cache()
         return self.response_data
 
-    def all(self):
+    def all(self) -> list[DC]:
         return list(self)
 
     def values_list(self, *fields):
@@ -212,6 +232,12 @@ class ResultsIterator(Generic[B, DC]):
                     )
 
                 for field in fields_to_use:
+                    if '__' in field:
+                        lhv, rhv = field.split('__')
+                        relationship = getattr(item, lhv)
+                        data[field] = getattr(relationship, rhv)
+                        continue
+
                     data[field] = getattr(item, field)
                 yield data
         return list(dict_generator(fields))
