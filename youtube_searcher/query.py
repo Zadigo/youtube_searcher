@@ -71,6 +71,10 @@ class QueryDict(Query):
 
 
 class QueryList(Query):
+    """`QueryList` returns a list of `QueryDict`
+    instances in order to traverse dictionnaries
+    nested within a list"""
+
     def __init__(self, initial_data: list):
         super().__init__(initial_data)
 
